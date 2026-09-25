@@ -42,6 +42,9 @@ target_compile_features(_cgal PRIVATE cxx_std_17)
 # degeneracies. CGAL_HAS_THREADS makes CGAL's global state thread-safe, which
 # is required because we mesh independent regions concurrently.
 target_compile_definitions(_cgal PRIVATE CGAL_DEBUG=1 CGAL_HAS_THREADS)
+if(MSVC)
+    target_compile_definitions(_cgal PRIVATE _USE_MATH_DEFINES)
+endif()
 
 # Stub generation -> padne/_cgal.pyi
 nanobind_add_stub(

@@ -1,0 +1,101 @@
+name: Build Windows binary
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/build-windows.yaml'
+      - 'padne/**'
+      - 'pyproject.toml'
+      - '.gitmodules'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/build-windows.yaml'
+      - 'padne/**'
+      - 'pyproject.toml'
+      - '.gitmodules'
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - name: Check out source and CGAL
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install KiCad 10
+        shell: pwsh
+        run: |
+          choco install kicad --version=10.0.3 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "KiCad installation failed" }
+          $python = Get-ChildItem 'C:\Program Files\KiCad\10.0' -Filter python.exe -Recurse -File |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $python) { throw "KiCad's bundled Python was not found" }
+          $bin = Split-Path $python
+          "PADNE_PYTHON=$python" >> $env:GITHUB_ENV
+          "PADNE_KICAD_BIN=$bin" >> $env:GITHUB_ENV
+          $bin >> $env:GITHUB_PATH
+          & $python -c "import sys, pcbnew; print(sys.version); print(pcbnew.GetBuildVersion())"
+          if ($LASTEXITCODE -ne 0) { throw "KiCad Python cannot import pcbnew" }
+
+      - name: Install CGAL build dependencies
+        shell: pwsh
+        run: |
+          $vcpkg = Join-Path $env:VCPKG_INSTALLATION_ROOT 'vcpkg.exe'
+          & $vcpkg install cgal:x64-windows
+          if ($LASTEXITCODE -ne 0) { throw "vcpkg dependency installation failed" }
+          "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
+
+      - name: Build padne with KiCad's Python
+        shell: pwsh
+        run: |
+          & $env:PADNE_PYTHON -m ensurepip --upgrade
+          if ($LASTEXITCODE -ne 0) { throw "Could not enable pip in KiCad Python" }
+          & $env:PADNE_PYTHON -m pip install --upgrade pip
+          if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
+          & $env:PADNE_PYTHON -m pip install -v -e . pyinstaller
+          if ($LASTEXITCODE -ne 0) { throw "padne build failed" }
+          & $env:PADNE_PYTHON -c "import pcbnew, padne._cgal, padne._mesh, PySide6; print('Native imports OK')"
+          if ($LASTEXITCODE -ne 0) { throw "Native import check failed" }
+
+      - name: Bundle Windows application
+        shell: pwsh
+        run: |
+          & $env:PADNE_PYTHON -m PyInstaller --clean --noconfirm --onedir --name padne `
+            --hidden-import pcbnew --hidden-import _pcbnew `
+            --collect-submodules padne --collect-submodules OpenGL.arrays `
+            --collect-data pygerber padne/cli.py
+          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
+
+      - name: Smoke test bundled application
+        shell: pwsh
+        run: |
+          & .\dist\padne\padne.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "Version check failed" }
+          & .\dist\padne\padne.exe solve tests/kicad/ldo/ldo.kicad_pro solution.pickle
+          if ($LASTEXITCODE -ne 0) { throw "Bundled solver test failed" }
+          & .\dist\padne\padne.exe paraview solution.pickle paraview_out
+          if ($LASTEXITCODE -ne 0) { throw "Bundled export test failed" }
+          if (-not (Get-ChildItem paraview_out -Filter '*.vtu' -Recurse)) {
+            throw "No VTU output was produced"
+          }
+
+      - name: Package application
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/padne -DestinationPath "padne-windows-x64-$env:GITHUB_SHA.zip"
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: padne-windows-x64
+          path: padne-windows-x64-${{ github.sha }}.zip
+          if-no-files-found: error
+          retention-days: 30

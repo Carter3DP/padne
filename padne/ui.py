@@ -9,7 +9,7 @@ import OpenGL.GL as gl
 import time
 import concurrent.futures
 
-from typing import Optional, ClassVar
+from typing import Optional, ClassVar, Generic, TypeVar
 from dataclasses import dataclass, field
 
 import abc
@@ -143,7 +143,11 @@ void main() {
 """
 
 
-class DeferedDict[K, V]:
+K = TypeVar('K')
+V = TypeVar('V')
+
+
+class DeferedDict(Generic[K, V]):
     """
     A dictionary-like object that can hold futures for values,
     unwrapping them when accessed.

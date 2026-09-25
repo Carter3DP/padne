@@ -53,6 +53,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "vcpkg dependency installation failed" }
           "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
 
+      - name: Install Python development files
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          architecture: x64
+
       - name: Build padne with KiCad's Python
         shell: pwsh
         run: |
@@ -60,7 +66,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not enable pip in KiCad Python" }
           & $env:PADNE_PYTHON -m pip install --upgrade pip
           if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
-          & $env:PADNE_PYTHON -m pip install -v -e . pyinstaller
+          $include = Join-Path $env:pythonLocation 'include'
+          $library = Join-Path $env:pythonLocation 'libs/python311.lib'
+          if (-not (Test-Path $include) -or -not (Test-Path $library)) {
+            throw "Python 3.11 development files were not found"
+          }
+          & $env:PADNE_PYTHON -m pip install -v `
+            --config-settings "cmake.define.Python_INCLUDE_DIR=$include" `
+            --config-settings "cmake.define.Python_LIBRARY=$library" `
+            -e .
+          if ($LASTEXITCODE -ne 0) { throw "padne build failed" }
+          & $env:PADNE_PYTHON -m pip install pyinstaller
           if ($LASTEXITCODE -ne 0) { throw "padne build failed" }
           & $env:PADNE_PYTHON -c "import pcbnew, padne._cgal, padne._mesh, PySide6; print('Native imports OK')"
           if ($LASTEXITCODE -ne 0) { throw "Native import check failed" }

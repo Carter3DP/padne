@@ -98,21 +98,26 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "padne build failed" }
           & $env:PADNE_PYTHON -m pip install pyinstaller
           if ($LASTEXITCODE -ne 0) { throw "padne build failed" }
-          & $env:PADNE_PYTHON -c "import pcbnew, padne._cgal, padne._mesh, PySide6; print('Native imports OK')"
+          & $env:PADNE_PYTHON -c "import os; dlls=os.path.join(os.environ['VCPKG_INSTALLATION_ROOT'], 'installed', 'x64-windows', 'bin'); handle=os.add_dll_directory(dlls); import pcbnew, padne._cgal, padne._mesh, PySide6; print('Native imports OK')"
           if ($LASTEXITCODE -ne 0) { throw "Native import check failed" }
 
       - name: Bundle Windows application
         shell: pwsh
         run: |
+          $vcpkgBin = Join-Path $env:VCPKG_INSTALLATION_ROOT 'installed\x64-windows\bin'
           & $env:PADNE_PYTHON -m PyInstaller --clean --noconfirm --onedir --name padne `
             --hidden-import pcbnew --hidden-import _pcbnew `
             --collect-submodules padne --collect-submodules OpenGL.arrays `
-            --collect-data pygerber padne/cli.py
+            --collect-data pygerber --add-binary "$vcpkgBin;." padne/cli.py
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
       - name: Smoke test bundled application
         shell: pwsh
         run: |
+          $vcpkgBin = Join-Path $env:VCPKG_INSTALLATION_ROOT 'installed\x64-windows\bin'
+          $env:PATH = (($env:PATH -split ';') | Where-Object {
+            $_ -and $_ -ne $env:PADNE_KICAD_BIN -and $_ -ne $vcpkgBin
+          }) -join ';'
           & .\dist\padne\padne.exe --version
           if ($LASTEXITCODE -ne 0) { throw "Version check failed" }
           & .\dist\padne\padne.exe solve tests/kicad/ldo/ldo.kicad_pro solution.pickle

@@ -90,7 +90,7 @@ jobs:
       - name: Package application
         shell: pwsh
         run: |
-          Compress-Archive -Path dist/padne -DestinationPath "padne-windows-x64-$env:GITHUB_SHA.zip"
+          Compress-Archive -Path dist/padne -DestinationPath "padne-windows-x64-$($env:GITHUB_SHA).zip"
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4

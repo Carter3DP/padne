@@ -118,7 +118,8 @@ jobs:
             --hidden-import padne.parallel --hidden-import padne.paraview `
             --hidden-import padne.gerber `
             --collect-submodules padne --collect-submodules OpenGL.arrays `
-            --collect-data pygerber --add-binary "$vcpkgBin;." `
+            --collect-data pygerber --add-data "$env:GITHUB_WORKSPACE\padne;padne" `
+            --add-binary "$vcpkgBin;." `
             --add-binary "$cgal;padne" --add-binary "$mesh;padne" padne/cli.py
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
@@ -129,6 +130,7 @@ jobs:
           $env:PATH = (($env:PATH -split ';') | Where-Object {
             $_ -and $_ -ne $env:PADNE_KICAD_BIN -and $_ -ne $vcpkgBin
           }) -join ';'
+          Get-ChildItem .\dist\padne\_internal\padne | Select-Object -ExpandProperty Name
           & .\dist\padne\padne.exe --version
           if ($LASTEXITCODE -ne 0) { throw "Version check failed" }
           & .\dist\padne\padne.exe solve tests/kicad/ldo/ldo.kicad_pro solution.pickle

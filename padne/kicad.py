@@ -1317,15 +1317,15 @@ def plot_board_layer_to_gerber(board: pcbnew.BOARD, layer_id: int, output_path: 
         layer_name = board.GetLayerName(layer_id)
         plot_controller.OpenPlotfile(layer_name, pcbnew.PLOT_FORMAT_GERBER, "")
 
-        # Plot the layer
-        assert plot_controller.PlotLayer(), f"Failed to plot layer {layer_name}"
+        # Close the plot before moving its file. Windows cannot rename an open file.
+        try:
+            assert plot_controller.PlotLayer(), f"Failed to plot layer {layer_name}"
+            gerber_path = Path(plot_controller.GetPlotFileName())
+        finally:
+            plot_controller.ClosePlot()
 
-        gerber_path = Path(plot_controller.GetPlotFileName())
         assert gerber_path.exists(), f"Gerber file {gerber_path} does not exist"
         gerber_path.rename(output_path)
-
-        # Close the plot
-        plot_controller.ClosePlot()
 
 
 @stage_timer

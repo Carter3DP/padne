@@ -109,7 +109,14 @@ jobs:
           $mesh = & $env:PADNE_PYTHON -c "import padne._mesh as m; print(m.__file__)"
           if (-not (Test-Path $cgal) -or -not (Test-Path $mesh)) { throw "Compiled padne extensions were not found" }
           & $env:PADNE_PYTHON -m PyInstaller --clean --noconfirm --onedir --name padne `
+            --paths "$env:GITHUB_WORKSPACE" `
             --hidden-import pcbnew --hidden-import _pcbnew `
+            --hidden-import padne.ui --hidden-import padne.kicad `
+            --hidden-import padne.mesh --hidden-import padne.solver `
+            --hidden-import padne.problem --hidden-import padne.units `
+            --hidden-import padne.colormaps --hidden-import padne.context `
+            --hidden-import padne.parallel --hidden-import padne.paraview `
+            --hidden-import padne.gerber `
             --collect-submodules padne --collect-submodules OpenGL.arrays `
             --collect-data pygerber --add-binary "$vcpkgBin;." `
             --add-binary "$cgal;padne" --add-binary "$mesh;padne" padne/cli.py

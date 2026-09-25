@@ -19,10 +19,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-windows:
     runs-on: windows-2022
     timeout-minutes: 120
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\\.vcpkg-cache
     steps:
       - name: Check out source and CGAL
         uses: actions/checkout@v4
@@ -45,13 +51,26 @@ jobs:
           & $python -c "import sys, pcbnew; print(sys.version); print(pcbnew.GetBuildVersion())"
           if ($LASTEXITCODE -ne 0) { throw "KiCad Python cannot import pcbnew" }
 
+      - name: Restore vcpkg binary cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-cgal-windows-2022-v1
+
       - name: Install CGAL build dependencies
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
           $vcpkg = Join-Path $env:VCPKG_INSTALLATION_ROOT 'vcpkg.exe'
           & $vcpkg install cgal:x64-windows
           if ($LASTEXITCODE -ne 0) { throw "vcpkg dependency installation failed" }
           "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake" >> $env:GITHUB_ENV
+
+      - name: Save vcpkg binary cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-cgal-windows-2022-v1
 
       - name: Install Python development files
         uses: actions/setup-python@v6

@@ -123,6 +123,14 @@ jobs:
             --add-binary "$cgal;padne" --add-binary "$mesh;padne" padne/cli.py
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
+      - name: Check custom KiCad layer names
+        shell: pwsh
+        run: |
+          & $env:PADNE_PYTHON -m pip install pytest
+          if ($LASTEXITCODE -ne 0) { throw "pytest installation failed" }
+          & $env:PADNE_PYTHON -m pytest -q tests/test_custom_layer_stackup.py
+          if ($LASTEXITCODE -ne 0) { throw "Custom layer regression test failed" }
+
       - name: Smoke test bundled application
         shell: pwsh
         run: |

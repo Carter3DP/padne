@@ -144,6 +144,13 @@ def extract_stackup_from_kicad_pcb(board: pcbnew.BOARD,
         sexpr = sexpdata.load(f)
 
     stackup_items = []
+    # KiCad writes standard names (for example In1.Cu) in the physical stackup,
+    # while pcbnew.GetLayerName returns custom names (for example Inner1.Cu).
+    # Use the displayed names throughout Padne so plotted copper and vias match.
+    layer_names = {
+        str(board.GetStandardLayerName(layer_id)): str(board.GetLayerName(layer_id))
+        for layer_id in copper_layers(board)
+    }
 
     if sexpr[0] != sexpdata.Symbol("kicad_pcb"):
         raise ValueError("Unknown initial key in the PCB file")
@@ -165,9 +172,9 @@ def extract_stackup_from_kicad_pcb(board: pcbnew.BOARD,
         # Use custom conductivity if provided, otherwise use default
         return Stackup(
             items=[
-                StackupItem(name="F.Cu", thickness=0.035, conductivity=copper_conductivity),
+                StackupItem(name=layer_names.get("F.Cu", "F.Cu"), thickness=0.035, conductivity=copper_conductivity),
                 StackupItem(name="dielectric 1", thickness=1.51),
-                StackupItem(name="B.Cu", thickness=0.035, conductivity=copper_conductivity),
+                StackupItem(name=layer_names.get("B.Cu", "B.Cu"), thickness=0.035, conductivity=copper_conductivity),
             ]
         )
 
@@ -208,7 +215,7 @@ def extract_stackup_from_kicad_pcb(board: pcbnew.BOARD,
             continue
 
         stackup_items.append(StackupItem(
-            name=layer_name,
+            name=layer_names.get(layer_name, layer_name),
             thickness=thickness,
             conductivity=conductivity
         ))
